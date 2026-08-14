@@ -14,3 +14,4 @@ order_id,order_date,customer_id,product_id,category,quantity,unit_price,discount
 10013,2026-07-07,C003,P013,Electronics,1,72000,0.08,S003,Credit Card
 10014,2026-07-07,C004,P014,Home Appliances,2,12500,0.06,S002,UPI
 10015,2026-07-08,C005,P015,Furniture,2,16500,0.05,S001,Debit Card
+10016,2026-07-08,C001,P016,Electronics,1,30000,0.05,S002,UPI

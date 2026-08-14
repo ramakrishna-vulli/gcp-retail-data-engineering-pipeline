@@ -1,12 +1,10 @@
-
-from pathlib import Path
-
 from analytics import (
     create_category_sales,
     create_daily_sales,
     create_payment_method_sales,
     create_store_sales,
 )
+
 from bigquery_loader import (
     create_bigquery_client,
     create_category_sales_schema,
@@ -14,21 +12,21 @@ from bigquery_loader import (
     create_payment_method_sales_schema,
     create_sales_schema,
     create_store_sales_schema,
-    create_table_if_not_exists,
+    filter_new_sales,
     load_dataframe_to_bigquery,
+    SALES_TABLE_NAME,
 )
+
 from data_quality import (
     print_quality_report,
     run_quality_checks,
 )
+
 from transform import (
     create_spark_session,
     load_sales,
     transform_sales,
 )
-
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 def run_pipeline():
@@ -44,9 +42,9 @@ def run_pipeline():
 
     try:
 
-        # --------------------------------------------------
+        # ====================================================
         # 1. Load source data
-        # --------------------------------------------------
+        # ====================================================
 
         print()
         print(
@@ -57,23 +55,27 @@ def run_pipeline():
             spark
         )
 
-        source_count = sales_df.count()
+        source_count = (
+            sales_df.count()
+        )
 
         print(
             f"Records loaded: {source_count}"
         )
 
-        # --------------------------------------------------
+        # ====================================================
         # 2. Transform data
-        # --------------------------------------------------
+        # ====================================================
 
         print()
         print(
             "[2/5] Transforming sales data..."
         )
 
-        transformed_df = transform_sales(
-            sales_df
+        transformed_df = (
+            transform_sales(
+                sales_df
+            )
         )
 
         transformed_count = (
@@ -85,9 +87,9 @@ def run_pipeline():
             f"{transformed_count}"
         )
 
-        # --------------------------------------------------
+        # ====================================================
         # 3. Data quality
-        # --------------------------------------------------
+        # ====================================================
 
         print()
         print(
@@ -111,17 +113,19 @@ def run_pipeline():
                 "Pipeline stopped."
             )
 
-        # --------------------------------------------------
+        # ====================================================
         # 4. Create analytics
-        # --------------------------------------------------
+        # ====================================================
 
         print()
         print(
             "[4/5] Creating analytics..."
         )
 
-        daily_df = create_daily_sales(
-            transformed_df
+        daily_df = (
+            create_daily_sales(
+                transformed_df
+            )
         )
 
         category_df = (
@@ -130,8 +134,10 @@ def run_pipeline():
             )
         )
 
-        store_df = create_store_sales(
-            transformed_df
+        store_df = (
+            create_store_sales(
+                transformed_df
+            )
         )
 
         payment_df = (
@@ -160,61 +166,94 @@ def run_pipeline():
             f"{payment_df.count()}"
         )
 
-        # --------------------------------------------------
-        # 5. Load to BigQuery
-        # --------------------------------------------------
+        # ====================================================
+        # 5. BigQuery loading
+        # ====================================================
 
         print()
         print(
             "[5/5] Loading data to BigQuery..."
         )
 
-        client = create_bigquery_client()
-
-        # Create tables.
-
-        create_table_if_not_exists(
-            client,
-            "sales",
-            create_sales_schema(),
+        client = (
+            create_bigquery_client()
         )
 
-        create_table_if_not_exists(
-            client,
-            "daily_sales",
-            create_daily_sales_schema(),
+        # ----------------------------------------------------
+        # Validate production sales table
+        # ----------------------------------------------------
+
+        from bigquery_loader import (
+            validate_sales_table,
         )
 
-        create_table_if_not_exists(
-            client,
-            "category_sales",
-            create_category_sales_schema(),
+        sales_table = validate_sales_table(
+            client
         )
 
-        create_table_if_not_exists(
-            client,
-            "store_sales",
-            create_store_sales_schema(),
+        print()
+        print(
+            f"Production sales table: "
+            f"{SALES_TABLE_NAME}"
         )
 
-        create_table_if_not_exists(
-            client,
-            "payment_method_sales",
-            create_payment_method_sales_schema(),
+        # ----------------------------------------------------
+        # Incremental sales filtering
+        # ----------------------------------------------------
+
+        print()
+        print(
+            "Checking for new sales records..."
         )
 
-        # Load sales.
+        new_sales_df = (
+            filter_new_sales(
+                client,
+                transformed_df,
+            )
+        )
+
+        new_sales_count = (
+            new_sales_df.count()
+        )
+
+        already_loaded_count = (
+            transformed_count
+            - new_sales_count
+        )
+
+        print()
+        print(
+            f"Source records: "
+            f"{transformed_count}"
+        )
+
+        print(
+            f"Already loaded: "
+            f"{already_loaded_count}"
+        )
+
+        print(
+            f"New records: "
+            f"{new_sales_count}"
+        )
+
+        # ----------------------------------------------------
+        # Append only new sales
+        # ----------------------------------------------------
 
         sales_table = (
             load_dataframe_to_bigquery(
                 client,
-                transformed_df,
-                "sales",
+                new_sales_df,
+                SALES_TABLE_NAME,
                 create_sales_schema(),
             )
         )
 
-        # Load daily analytics.
+        # ----------------------------------------------------
+        # Analytics tables
+        # ----------------------------------------------------
 
         daily_table = (
             load_dataframe_to_bigquery(
@@ -225,8 +264,6 @@ def run_pipeline():
             )
         )
 
-        # Load category analytics.
-
         category_table = (
             load_dataframe_to_bigquery(
                 client,
@@ -235,8 +272,6 @@ def run_pipeline():
                 create_category_sales_schema(),
             )
         )
-
-        # Load store analytics.
 
         store_table = (
             load_dataframe_to_bigquery(
@@ -247,8 +282,6 @@ def run_pipeline():
             )
         )
 
-        # Load payment analytics.
-
         payment_table = (
             load_dataframe_to_bigquery(
                 client,
@@ -258,9 +291,9 @@ def run_pipeline():
             )
         )
 
-        # --------------------------------------------------
+        # ====================================================
         # Final summary
-        # --------------------------------------------------
+        # ====================================================
 
         print()
         print("=" * 60)
@@ -270,42 +303,52 @@ def run_pipeline():
         print("=" * 60)
 
         print()
+
         print(
-            "BigQuery tables:"
+            f"Production sales table: "
+            f"{SALES_TABLE_NAME}"
         )
 
         print(
-            f"sales: "
-            f"{sales_table.num_rows} rows"
+            f"New sales loaded: "
+            f"{new_sales_count}"
         )
 
         print(
-            f"daily_sales: "
-            f"{daily_table.num_rows} rows"
+            f"Sales table rows: "
+            f"{sales_table.num_rows}"
         )
 
         print(
-            f"category_sales: "
-            f"{category_table.num_rows} rows"
+            f"Daily sales rows: "
+            f"{daily_table.num_rows}"
         )
 
         print(
-            f"store_sales: "
-            f"{store_table.num_rows} rows"
+            f"Category sales rows: "
+            f"{category_table.num_rows}"
         )
 
         print(
-            f"payment_method_sales: "
-            f"{payment_table.num_rows} rows"
+            f"Store sales rows: "
+            f"{store_table.num_rows}"
+        )
+
+        print(
+            f"Payment method sales rows: "
+            f"{payment_table.num_rows}"
         )
 
         print()
+
         print(
-            "Project: vast-falcon-415411"
+            "Project: "
+            "vast-falcon-415411"
         )
 
         print(
-            "Dataset: retail_analytics"
+            "Dataset: "
+            "retail_analytics"
         )
 
         print("=" * 60)
@@ -316,6 +359,7 @@ def run_pipeline():
 
 
 def main():
+
     run_pipeline()
 
 
