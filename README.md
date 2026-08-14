@@ -701,3 +701,32 @@ BigQuery SQL analytics
 ```
 
 All automated tests currently pass, and the complete pipeline has been successfully executed against Google BigQuery.
+
+
+GCS Raw Layer
+     ↓
+PySpark
+     ↓
+Data Quality
+     ↓
+Transformations
+     ↓
+Incremental BigQuery Load
+     ↓
+Partitioned + Clustered BigQuery
+     ↓
+Analytics Tables
+
+
+
+GCP project and dataset
+GCS raw-data structure
+Local/GCS source configuration
+BigQuery tables
+Incremental loading
+Partitioning and clustering
+Data-quality checks
+Test results
+How to run the project
+Required environment/authentication
+Sample pipeline output
