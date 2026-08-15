@@ -1,0 +1,82 @@
+name: Retail Data Pipeline
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    - cron: "30 3 * * *"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  pipeline:
+
+    name: Run Retail Pipeline
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ----------------------------------------------------
+      # 1. Checkout repository
+      # ----------------------------------------------------
+
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      # ----------------------------------------------------
+      # 2. Authenticate to Google Cloud
+      # ----------------------------------------------------
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/58732998783/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider"
+          service_account: "github-actions-retail-pipeline@vast-falcon-415411.iam.gserviceaccount.com"
+
+      # ----------------------------------------------------
+      # 3. Setup Python
+      # ----------------------------------------------------
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # ----------------------------------------------------
+      # 4. Setup Java
+      # ----------------------------------------------------
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # ----------------------------------------------------
+      # 5. Upgrade pip
+      # ----------------------------------------------------
+
+      - name: Upgrade pip
+        run: |
+          python -m pip install --upgrade pip
+
+      # ----------------------------------------------------
+      # 6. Install dependencies
+      # ----------------------------------------------------
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      # ----------------------------------------------------
+      # 7. Run Retail Pipeline
+      # ----------------------------------------------------
+
+      - name: Run Retail Pipeline
+        env:
+          RETAIL_DATA_SOURCE: GCS
+        run: |
+          python -m src.orchestrator
