@@ -1,47 +1,49 @@
 # GCP Retail Data Engineering Pipeline
 
-A production-style retail data engineering pipeline built using **Python, PySpark, Google Cloud Storage (GCS), and BigQuery**.
+A production-style retail data engineering pipeline built using Python, PySpark, Google Cloud Storage (GCS), and BigQuery.
 
-The project demonstrates an end-to-end cloud data engineering workflow:
+The project demonstrates an end-to-end cloud data engineering workflow including:
 
 - Raw data ingestion into Google Cloud Storage
 - PySpark-based data transformation
 - Data quality validation
-- Incremental loading using `order_id`
+- Retail sales calculations
+- Incremental loading using order_id
 - BigQuery partitioning
 - BigQuery clustering
 - Retail sales analytics
+- Lightweight pipeline orchestration
+- Task dependency management
+- Retry handling
 - Automated testing with PyTest
 - Google Cloud authentication using Application Default Credentials (ADC)
 
 ---
 
-## 1. Project Overview
+# 1. Project Overview
 
-This project simulates a retail data engineering platform on Google Cloud.
+This project simulates a production-style retail data engineering platform on Google Cloud.
 
-Retail sales data is first stored in a **raw layer in Google Cloud Storage**.
+Retail sales data is stored in a raw layer in Google Cloud Storage.
 
-PySpark then:
+The pipeline then:
 
-1. Reads the raw sales data
-2. Transforms the data
-3. Calculates sales metrics
-4. Performs data quality validation
-5. Identifies new records
-6. Loads only new records into BigQuery
-7. Refreshes analytical tables
-
-The main production sales table is optimized using:
-
-- **Partitioning by `order_date`**
-- **Clustering by `category` and `store_id`**
+1. Loads the raw sales data
+2. Processes the data using PySpark
+3. Performs data transformations
+4. Runs data quality checks
+5. Creates analytical datasets
+6. Checks existing BigQuery order_id values
+7. Loads only new sales records
+8. Stores production data in a partitioned and clustered BigQuery table
+9. Generates analytical tables
+10. Orchestrates the complete workflow using reusable tasks
+11. Validates the implementation using automated tests
 
 ---
 
 # 2. Architecture
 
-```text
                          Google Cloud
                               |
                               v
@@ -64,88 +66,123 @@ The main production sales table is optimized using:
                  +------------------------+
                  |     Data Quality       |
                  |                        |
-                 | Null checks             |
-                 | Quantity validation     |
-                 | Price validation        |
-                 | Discount validation     |
-                 | Duplicate validation    |
+                 | Null checks            |
+                 | Quantity validation    |
+                 | Price validation       |
+                 | Discount validation    |
+                 | Duplicate validation  |
                  +-----------+------------+
                              |
                              v
                  +------------------------+
-                 |  Incremental Processing|
+                 | Incremental Processing |
                  |                        |
-                 | Existing order_id check |
+                 | Existing order_id check|
                  +-----------+------------+
                              |
                              v
-        +------------------------------------------------+
-        |                    BigQuery                     |
-        |                                                 |
-        | sales_partitioned                               |
-        |   Partition: order_date                         |
-        |   Cluster: category, store_id                   |
-        |                                                 |
-        | daily_sales                                     |
-        | category_sales                                  |
-        | store_sales                                     |
-        | payment_method_sales                            |
-        +------------------------------------------------+
-		
-3. End-to-End Data Flow
+                 +------------------------+
+                 |       BigQuery         |
+                 |                        |
+                 | sales_partitioned      |
+                 |                        |
+                 | Partition: order_date  |
+                 | Cluster: category,     |
+                 |           store_id      |
+                 +-----------+------------+
+                             |
+                             v
+                 +------------------------+
+                 |      Analytics         |
+                 |                        |
+                 | daily_sales            |
+                 | category_sales         |
+                 | store_sales            |
+                 | payment_method_sales   |
+                 +-----------+------------+
+                             |
+                             v
+                 +------------------------+
+                 |    Orchestration       |
+                 |                        |
+                 | Task execution         |
+                 | Dependencies           |
+                 | Retry handling         |
+                 | Logging                |
+                 +------------------------+
+
+---
+
+# 3. End-to-End Data Flow
 
 GCS Raw Data
      |
      v
-PySpark
+Load Source
      |
-     +--> Data Transformation
+     v
+PySpark Transformation
      |
-     +--> Data Quality
+     v
+Data Quality
      |
-     +--> Sales Calculations
+     v
+Create Analytics
+     |
+     v
+BigQuery Connection
      |
      v
 Incremental Order ID Check
      |
      v
-BigQuery
+Load New Records
      |
-     +--> sales_partitioned
+     v
+Analytics Tables
      |
-     +--> daily_sales
-     |
-     +--> category_sales
-     |
-     +--> store_sales
-     |
-     +--> payment_method_sales
-	 
-4. Technologies
-| Technology            | Version / Purpose    |
-| --------------------- | -------------------- |
-| Python                | 3.12.7               |
-| PySpark               | 4.2.0                |
-| Py4J                  | 0.10.9.9             |
-| Pandas                | 2.3.3                |
-| PyArrow               | 25.0.0               |
-| Google Cloud BigQuery | 3.43.0               |
-| Google Cloud Storage  | GCS Python client    |
-| PyTest                | 9.1.1                |
+     v
+Pipeline Cleanup
+
+---
+
+# 4. Technologies
+
+| Technology | Version / Purpose |
+|---|---|
+| Python | 3.12.7 |
+| PySpark | 4.2.0 |
+| Py4J | 0.10.9.9 |
+| Pandas | 2.3.3 |
+| PyArrow | 25.0.0 |
+| Google Cloud BigQuery | 3.43.0 |
+| Google Cloud Storage | GCS Python client |
+| PyTest | 9.1.1 |
 | Google Cloud Platform | Cloud infrastructure |
 
+---
 
-5. Google Cloud Configuration
-GCP Project
+# 5. Google Cloud Configuration
+
+## GCP Project
+
 vast-falcon-415411
-BigQuery Dataset
+
+## BigQuery Dataset
+
 retail_analytics
-GCS Bucket
+
+## GCS Bucket
+
 vast-falcon-415411-retail-raw
-GCS Raw Data Path
+
+## GCS Raw Data Path
+
 gs://vast-falcon-415411-retail-raw/raw/retail/sales/sales.csv
 
-6. GCS Raw Data Layer
+---
+
+# 6. GCS Raw Data Layer
 
 The raw retail sales data is stored in Google Cloud Storage.
 
@@ -175,12 +212,15 @@ store_id
 payment_method
 
 Current sample dataset:
+
 16 records
 
+---
 
-7. Source Data
+# 7. Source Data
 
 Example source record:
+
 order_id,order_date,customer_id,product_id,category,quantity,unit_price,discount,store_id,payment_method
 10016,2026-07-08,C001,P016,Electronics,1,30000,0.05,S002,UPI
 
@@ -196,36 +236,43 @@ Gross Sales       = 30,000
 Discount Amount   = 1,500
 Net Sales         = 28,500
 
-8. PySpark Transformation
+---
 
-The PySpark transformation layer performs the following operations.
+# 8. PySpark Transformation
 
-Date Conversion
-order_date
+The transformation layer performs the following operations.
 
-is converted into a Spark date.
+## Date Conversion
 
-Numeric Conversion
+order_date is converted into a Spark date.
+
+## Numeric Conversion
 
 The following columns are converted to numeric types:
 
 quantity
 unit_price
 discount
-Gross Sales
-gross_sales =
-quantity * unit_price
-Discount Amount
-discount_amount =
-quantity * unit_price * discount
-Net Sales
-net_sales =
-quantity * unit_price * (1 - discount)
-9. Data Quality
+
+## Gross Sales
+
+gross_sales = quantity * unit_price
+
+## Discount Amount
+
+discount_amount = quantity * unit_price * discount
+
+## Net Sales
+
+net_sales = quantity * unit_price * (1 - discount)
+
+---
+
+# 9. Data Quality
 
 The pipeline validates the source data before loading it into BigQuery.
 
-Null Checks
+## Null Checks
 
 The following columns are checked:
 
@@ -239,24 +286,26 @@ unit_price
 discount
 store_id
 payment_method
-Quantity Validation
+
+## Quantity Validation
 
 The pipeline checks for invalid quantity values.
 
-Price Validation
+## Price Validation
 
 The pipeline checks for invalid or non-positive prices.
 
-Discount Validation
+## Discount Validation
 
 The pipeline validates discount values.
 
-Duplicate Validation
+## Duplicate Validation
 
-The pipeline checks for duplicate:
+The pipeline checks for duplicate order_id values.
 
-order_id
-10. Data Quality Result
+---
+
+# 10. Data Quality Result
 
 The current dataset successfully passed the quality checks.
 
@@ -280,7 +329,10 @@ Invalid discount: 0
 Duplicate orders: 0
 
 Total quality errors: 0
-11. Incremental Loading
+
+---
+
+# 11. Incremental Loading
 
 The pipeline implements incremental loading using:
 
@@ -290,7 +342,7 @@ Before inserting records into BigQuery, the pipeline retrieves existing order ID
 
 Only records that do not already exist are loaded.
 
-Example
+## Example
 
 Initial state:
 
@@ -312,7 +364,9 @@ Sales table rows: 16
 
 This prevents duplicate order ingestion.
 
-12. BigQuery Production Table
+---
+
+# 12. BigQuery Production Table
 
 Production sales table:
 
@@ -321,7 +375,10 @@ vast-falcon-415411.retail_analytics.sales_partitioned
 Current row count:
 
 16
-13. BigQuery Partitioning
+
+---
+
+# 13. BigQuery Partitioning
 
 The production sales table is partitioned by:
 
@@ -339,42 +396,27 @@ order_date
 Partition type:
 DAY
 
-Partitioning allows queries filtered by date to process only relevant partitions instead of scanning the entire table.
+Partitioning allows date-based queries to work against relevant date partitions rather than requiring a scan of the entire table.
 
-14. BigQuery Clustering
+---
+
+# 14. BigQuery Clustering
 
 The production sales table is clustered by:
 
 category
 store_id
 
-Configuration:
+This supports common retail analytics queries involving category and store filtering/grouping.
 
-Cluster fields:
-category
-store_id
+---
 
-This is useful for retail queries that frequently filter or group data by category and store.
-
-15. BigQuery Sales Schema
-order_id: INT64 REQUIRED
-order_date: DATE REQUIRED
-customer_id: STRING REQUIRED
-product_id: STRING REQUIRED
-category: STRING REQUIRED
-quantity: INT64 REQUIRED
-unit_price: NUMERIC REQUIRED
-discount: NUMERIC REQUIRED
-store_id: STRING REQUIRED
-payment_method: STRING REQUIRED
-gross_sales: NUMERIC REQUIRED
-discount_amount: NUMERIC REQUIRED
-net_sales: NUMERIC REQUIRED
-16. BigQuery Analytical Tables
+# 15. BigQuery Analytical Tables
 
 The pipeline produces four analytical tables.
 
-Daily Sales
+## Daily Sales
+
 vast-falcon-415411.retail_analytics.daily_sales
 
 Current rows:
@@ -389,7 +431,9 @@ total_quantity
 gross_sales
 total_discount
 net_sales
-Category Sales
+
+## Category Sales
+
 vast-falcon-415411.retail_analytics.category_sales
 
 Current rows:
@@ -403,38 +447,25 @@ Electronics
 Furniture
 Home Appliances
 
-Columns:
+## Store Sales
 
-category
-order_count
-total_quantity
-net_sales
-Store Sales
 vast-falcon-415411.retail_analytics.store_sales
 
 Current rows:
 
 3
 
-Columns:
+## Payment Method Sales
 
-store_id
-order_count
-total_quantity
-net_sales
-Payment Method Sales
 vast-falcon-415411.retail_analytics.payment_method_sales
 
 Current rows:
 
 4
 
-Columns:
+---
 
-payment_method
-order_count
-net_sales
-17. Current BigQuery Results
+# 16. Current BigQuery Results
 
 Latest successful pipeline execution:
 
@@ -452,13 +483,185 @@ Payment method sales rows: 4
 
 Project: vast-falcon-415411
 Dataset: retail_analytics
+
 ============================================================
-18. Project Structure
+
+---
+
+# 17. Pipeline Orchestration
+
+The project includes a lightweight local orchestration layer.
+
+The orchestration layer separates the pipeline into reusable tasks.
+
+Task 1
+Create Spark Session
+        |
+        v
+Task 2
+Load Source Data
+        |
+        v
+Task 3
+Transform Sales
+        |
+        v
+Task 4
+Data Quality
+        |
+        v
+Task 5
+Create Analytics
+        |
+        v
+Task 6
+Create BigQuery Client
+        |
+        v
+Task 7
+Filter New Sales
+        |
+        v
+Task 8
+Load BigQuery
+        |
+        v
+Task 9
+Cleanup
+
+---
+
+# 18. Orchestration Components
+
+## src/tasks.py
+
+Contains reusable pipeline task functions.
+
+Tasks include:
+
+task_create_spark
+task_load_source
+task_transform
+task_data_quality
+task_create_analytics
+task_create_bigquery_client
+task_filter_new_sales
+task_load_bigquery
+task_cleanup
+
+A shared PipelineContext is used to maintain state while tasks execute within the same Python process.
+
+## src/orchestrator.py
+
+Responsible for:
+
+- Task execution
+- Task dependency/order
+- Retry handling
+- Task-level logging
+- Pipeline failure handling
+- Pipeline summary
+- Cleanup
+
+The orchestrator uses a maximum of two retries after the initial attempt.
+
+---
+
+# 19. Orchestration Retry Handling
+
+Maximum retries:
+2
+
+Total possible attempts:
+3
+
+Retry delay:
+5 seconds
+
+Example:
+
+Attempt 1
+   |
+   X Failure
+   |
+Attempt 2
+   |
+   X Failure
+   |
+Attempt 3
+   |
+   v
+Success / Final Failure
+
+---
+
+# 20. Orchestrator Execution
+
+Run:
+
+python -m src.orchestrator
+
+Latest successful execution:
+
+======================================================================
+PIPELINE COMPLETED SUCCESSFULLY
+======================================================================
+
+Duration: approximately 60 seconds
+Source records: 16
+Transformed records: 16
+New records: 0
+
+======================================================================
+
+The Spark cleanup task also completed successfully.
+
+---
+
+# 21. Airflow-Compatible Design
+
+The project also contains:
+
+dags/
+└── retail_pipeline_dag.py
+
+The DAG is designed to reuse the existing pipeline logic rather than duplicating business logic.
+
+The intended architecture is:
+
+Airflow
+   |
+   v
+retail_pipeline_dag.py
+   |
+   v
+src/pipeline.py
+   |
+   +--> GCS
+   +--> PySpark
+   +--> Data Quality
+   +--> Analytics
+   +--> BigQuery
+
+Airflow is not installed in the current Windows development environment.
+
+Docker is also not required for the current local implementation.
+
+The lightweight orchestrator provides the task-oriented architecture while keeping the existing development environment simple.
+
+---
+
+# 22. Project Structure
+
 gcp-retail-data-engineering-pipeline/
 |
 +-- data/
 |   |
 |   +-- sales.csv
+|
++-- dags/
+|   |
+|   +-- retail_pipeline_dag.py
 |
 +-- sql/
 |   |
@@ -466,47 +669,57 @@ gcp-retail-data-engineering-pipeline/
 |
 +-- src/
 |   |
+|   +-- __init__.py
 |   +-- analytics.py
 |   +-- bigquery_loader.py
 |   +-- data_quality.py
+|   +-- orchestrator.py
 |   +-- pipeline.py
-|   +-- transform.py
 |   +-- setup_partitioned_sales.py
+|   +-- tasks.py
 |   +-- test_bigquery_connection.py
+|   +-- transform.py
 |
 +-- tests/
 |   |
 |   +-- test_bigquery_incremental.py
 |   +-- test_data_quality.py
+|   +-- test_orchestrator.py
 |   +-- test_transform.py
 |
 +-- .gitignore
 +-- README.md
 +-- requirements.txt
-19. Source Code Components
-transform.py
+
+---
+
+# 23. Source Code Components
+
+## src/transform.py
 
 Responsible for:
 
-Creating the Spark session
-Loading source data
-Reading data from GCS
-Supporting local CSV fallback
-Transforming sales data
-Calculating gross sales
-Calculating discounts
-Calculating net sales
-data_quality.py
+- Creating the Spark session
+- Loading source data
+- Reading data from GCS
+- Supporting local CSV fallback
+- Transforming sales data
+- Calculating gross sales
+- Calculating discounts
+- Calculating net sales
+
+## src/data_quality.py
 
 Responsible for:
 
-Null validation
-Quantity validation
-Price validation
-Discount validation
-Duplicate validation
-Data quality reporting
-analytics.py
+- Null validation
+- Quantity validation
+- Price validation
+- Discount validation
+- Duplicate validation
+- Data quality reporting
+
+## src/analytics.py
 
 Responsible for generating:
 
@@ -514,20 +727,25 @@ daily_sales
 category_sales
 store_sales
 payment_method_sales
-bigquery_loader.py
+
+## src/bigquery_loader.py
 
 Responsible for:
 
-BigQuery client creation
-Schema definitions
-Production table validation
-Incremental order ID detection
-New-record loading
-Analytical table loading
-BigQuery partition/clustering validation
-pipeline.py
+- BigQuery client creation
+- BigQuery schemas
+- Production table validation
+- Incremental order ID detection
+- New-record loading
+- Analytical table loading
+- Partition validation
+- Clustering validation
 
-Orchestrates the complete pipeline:
+## src/pipeline.py
+
+The original end-to-end pipeline.
+
+It performs:
 
 Load
   |
@@ -540,7 +758,24 @@ Analytics
 Incremental Check
   |
 BigQuery Load
-setup_partitioned_sales.py
+
+## src/tasks.py
+
+Provides reusable functions for each pipeline stage.
+
+This makes the pipeline easier to orchestrate and provides a foundation for future Airflow task mapping.
+
+## src/orchestrator.py
+
+Provides lightweight local orchestration with:
+
+Task dependencies
+Retry handling
+Logging
+Failure handling
+Cleanup
+
+## src/setup_partitioned_sales.py
 
 Responsible for creating and validating:
 
@@ -554,17 +789,23 @@ order_date
 Clusters:
 category
 store_id
-20. Data Source Configuration
 
-The pipeline supports both GCS and local data sources.
+---
 
-GCS
+# 24. Data Source Configuration
+
+The pipeline supports two source modes.
+
+## GCS
+
 RETAIL_DATA_SOURCE=GCS
 
 GCS path:
 
 gs://vast-falcon-415411-retail-raw/raw/retail/sales/sales.csv
-Local
+
+## Local
+
 RETAIL_DATA_SOURCE=LOCAL
 
 Local path:
@@ -575,7 +816,9 @@ GCS is the default source for the production-style pipeline.
 
 The local CSV remains available as a development/test fallback.
 
-21. Google Cloud Authentication
+---
+
+# 25. Google Cloud Authentication
 
 The project uses Google Cloud Application Default Credentials.
 
@@ -590,24 +833,26 @@ gcloud config list
 Expected project:
 
 vast-falcon-415411
-22. BigQuery Connection Test
+
+---
+
+# 26. BigQuery Connection Test
 
 Run:
 
 python src\test_bigquery_connection.py
 
-Expected result:
-
-BigQuery client: 3.43.0
+Expected:
 
 BigQuery connection successful!
 Project: vast-falcon-415411
 Dataset: retail_analytics
-23. Install Dependencies
 
-Create and activate the virtual environment.
+---
 
-Windows:
+# 27. Install Dependencies
+
+Create a virtual environment:
 
 python -m venv .venv
 
@@ -618,18 +863,10 @@ Activate:
 Install dependencies:
 
 pip install -r requirements.txt
-24. Requirements
 
-The project uses:
+---
 
-pyspark==4.2.0
-py4j==0.10.9.9
-pandas==2.3.3
-pyarrow==25.0.0
-google-cloud-bigquery==3.43.0
-google-cloud-storage
-pytest==9.1.1
-25. Running the Pipeline
+# 28. Running the Standard Pipeline
 
 From the project root:
 
@@ -645,7 +882,38 @@ The pipeline performs:
 6. Load only new records
 7. Refresh analytics tables
 8. Print pipeline summary
-26. Running with GCS
+
+---
+
+# 29. Running the Orchestrated Pipeline
+
+Run:
+
+python -m src.orchestrator
+
+The orchestrator executes:
+
+create_spark_session
+        |
+load_source_data
+        |
+transform_sales
+        |
+data_quality
+        |
+create_analytics
+        |
+create_bigquery_client
+        |
+filter_new_sales
+        |
+load_bigquery
+        |
+cleanup
+
+---
+
+# 30. Running with GCS
 
 GCS is the default data source.
 
@@ -653,82 +921,139 @@ Run:
 
 python src\pipeline.py
 
+or:
+
+python -m src.orchestrator
+
 The pipeline reads:
 
 gs://vast-falcon-415411-retail-raw/raw/retail/sales/sales.csv
 
 and processes the data using PySpark.
 
-27. Running with Local Data
+---
+
+# 31. Running with Local Data
 
 For local development:
 
 set RETAIL_DATA_SOURCE=LOCAL
 python src\pipeline.py
 
-To use GCS again:
+Or:
+
+set RETAIL_DATA_SOURCE=LOCAL
+python -m src.orchestrator
+
+To return to GCS:
 
 set RETAIL_DATA_SOURCE=GCS
-python src\pipeline.py
-28. Run Individual Components
-Transformation
-python src\transform.py
-Analytics
-python src\analytics.py
-Data Quality
-python src\data_quality.py
-BigQuery Loader
-python src\bigquery_loader.py
-Complete Pipeline
-python src\pipeline.py
-29. Automated Testing
 
-Run all tests:
+---
+
+# 32. Running Individual Components
+
+Transformation:
+
+python src\transform.py
+
+Analytics:
+
+python src\analytics.py
+
+Data Quality:
+
+python src\data_quality.py
+
+BigQuery Loader:
+
+python src\bigquery_loader.py
+
+Partitioning:
+
+python src\setup_partitioned_sales.py
+
+Standard Pipeline:
+
+python src\pipeline.py
+
+Orchestrated Pipeline:
+
+python -m src.orchestrator
+
+---
+
+# 33. Automated Testing
+
+Run the complete test suite:
 
 python -m pytest tests -v
 
 Latest result:
 
-9 passed
-30. Test Coverage
-Incremental Loading Tests
+13 passed
+
+---
+
+# 34. Test Coverage
+
+## Incremental Loading Tests
+
 test_existing_orders_are_skipped
 test_new_order_is_loaded
 test_no_duplicate_orders
 test_all_existing_orders_return_empty
 
-These verify the incremental processing logic.
+## BigQuery Configuration Tests
 
-BigQuery Configuration Tests
 test_partition_configuration
 test_clustering_configuration
 
-These verify the intended production table configuration.
+## Data Quality Tests
 
-Data Quality Tests
 test_quality_checks_pass
 test_invalid_discount_fails
 
-These verify successful and failing data-quality scenarios.
+## Transformation Test
 
-Transformation Test
 test_sales_transformation
 
-This verifies the PySpark sales calculations.
+## Orchestration Tests
 
-31. Latest Test Result
-=========================== test session starts ===========================
+test_task_success
+test_task_retry
+test_task_failure_after_retries
+test_pipeline_task_order
 
-platform win32
-Python 3.12.7
-pytest 9.1.1
+These validate:
 
-collected 9 items
+- Successful task execution
+- Retry behavior
+- Failure handling
+- Task dependency/order
 
-9 passed in 63.58s
+---
 
-============================ 9 passed ==============================
-32. SQL Analytics
+# 35. Latest Test Result
+
+13 tests passed.
+
+Test areas:
+
+- Incremental loading
+- Duplicate prevention
+- Partition configuration
+- Clustering configuration
+- Data quality
+- Transformations
+- Task success
+- Retry handling
+- Failure handling
+- Task order
+
+---
+
+# 36. SQL Analytics
 
 SQL queries are maintained in:
 
@@ -769,61 +1094,42 @@ GROUP BY
     store_id
 ORDER BY
     total_net_sales DESC;
-33. Production Features
 
-This project demonstrates the following production-oriented data engineering practices.
+---
 
-Cloud Raw Layer
+# 37. Production Features
 
-Raw data is stored in:
+This project demonstrates several production-oriented data engineering practices.
 
-Google Cloud Storage
+Cloud Raw Layer:
+Raw data is stored in Google Cloud Storage.
 
-before processing.
+Distributed Processing:
+PySpark is used for data transformation, processing and aggregation.
 
-Distributed Processing
+Data Quality:
+The pipeline validates null values, invalid quantities, invalid prices, invalid discounts and duplicate orders.
 
-PySpark is used for:
-
-Data transformation
-Data processing
-Aggregation
-Data Quality
-
-The pipeline validates:
-
-Null values
-Invalid quantities
-Invalid prices
-Invalid discounts
-Duplicate orders
-Incremental Processing
-
+Incremental Processing:
 Existing order_id values are checked before inserting records.
 
-BigQuery Partitioning
+BigQuery Partitioning:
+Production sales data is partitioned by order_date.
 
-Production sales data is partitioned by:
+BigQuery Clustering:
+Production sales data is clustered by category and store_id.
 
-order_date
-BigQuery Clustering
+Orchestration:
+The pipeline is broken into reusable tasks with task dependencies, retry handling, logging, failure handling and cleanup.
 
-Production sales data is clustered by:
+Automated Testing:
+PyTest validates transformations, data quality, incremental logic, partition configuration, clustering configuration and orchestration.
 
-category
-store_id
-Automated Testing
+---
 
-PyTest validates:
+# 38. Windows Development Notes
 
-Transformations
-Data quality
-Incremental logic
-Partition configuration
-Clustering configuration
-34. Windows Development Notes
-
-This project was developed and tested locally on Windows.
+This project is developed and tested locally on Windows.
 
 PySpark may display warnings such as:
 
@@ -833,13 +1139,15 @@ and:
 
 Unable to load native-hadoop library
 
-These are related to the local Windows Spark environment.
+These warnings are related to the local Windows Spark environment.
 
 They do not prevent the current pipeline from successfully processing the data.
 
-The GCS integration uses the Google Cloud Storage Python client to download the raw CSV before PySpark processes it. This avoids requiring a Hadoop GCS connector for the local Windows development environment.
+The GCS integration uses the Google Cloud Storage Python client to download the raw CSV before PySpark processes it.
 
-35. GCS Processing Design
+---
+
+# 39. GCS Processing Design
 
 The local development flow uses:
 
@@ -854,9 +1162,11 @@ Temporary local CSV
         v
 PySpark
 
-This design was selected to keep local Windows development reliable while still using GCS as the cloud raw-data layer.
+This keeps local Windows development simple while still using GCS as the cloud raw-data layer.
 
-36. BigQuery Optimization
+---
+
+# 40. BigQuery Optimization
 
 The production sales table uses:
 
@@ -867,14 +1177,17 @@ Clustering:
 category
 store_id
 
-This design is intended to improve query efficiency for common retail analytics patterns such as:
+This design supports common retail analytics patterns such as:
 
 Sales by date
 Sales by category
 Sales by store
 Sales by date and category
 Sales by date and store
-37. Billing and Cost Awareness
+
+---
+
+# 41. Billing and Cost Awareness
 
 This project uses Google Cloud services including:
 
@@ -885,17 +1198,20 @@ GCP resources can incur charges depending on usage and billing configuration.
 
 Recommended practices:
 
-Keep development datasets small
-Avoid unnecessary large queries
-Monitor BigQuery usage
-Monitor Cloud Storage usage
-Configure billing budgets and alerts
-Delete unused resources when they are no longer required
+- Keep development datasets small
+- Avoid unnecessary large queries
+- Monitor BigQuery usage
+- Monitor Cloud Storage usage
+- Configure billing budgets and alerts
+- Delete unused resources when no longer required
 
 The current portfolio dataset is intentionally small.
 
-38. Project Development Phases
-Phase 1 — Local PySpark Pipeline
+---
+
+# 42. Project Development Phases
+
+## Phase 1 — Local PySpark Pipeline
 
 Status:
 
@@ -903,12 +1219,13 @@ COMPLETE
 
 Implemented:
 
-PySpark transformations
-Sales calculations
-Data quality validation
-Analytics
-Automated tests
-Phase 2 — BigQuery Integration
+- PySpark transformations
+- Sales calculations
+- Data quality validation
+- Analytics
+- Automated tests
+
+## Phase 2 — BigQuery Integration
 
 Status:
 
@@ -916,12 +1233,13 @@ COMPLETE
 
 Implemented:
 
-BigQuery client
-BigQuery schemas
-BigQuery loading
-Analytical tables
-ADC authentication
-Phase 3 — Incremental BigQuery Processing
+- BigQuery client
+- BigQuery schemas
+- BigQuery loading
+- Analytical tables
+- ADC authentication
+
+## Phase 3 — Incremental BigQuery Processing
 
 Status:
 
@@ -929,13 +1247,14 @@ COMPLETE
 
 Implemented:
 
-Existing order ID detection
-New-record loading
-Duplicate prevention
-Partitioned sales table
-Clustered sales table
-Automated incremental tests
-Phase 4 — GCS Raw Data Layer
+- Existing order ID detection
+- New-record loading
+- Duplicate prevention
+- Partitioned sales table
+- Clustered sales table
+- Incremental tests
+
+## Phase 4 — GCS Raw Data Layer
 
 Status:
 
@@ -943,44 +1262,70 @@ COMPLETE
 
 Implemented:
 
-GCS bucket
-Raw data folder structure
-Raw sales CSV
-Google Cloud Storage Python client
-GCS-to-PySpark integration
-GCS as default source
-Local CSV fallback
-39. Current End-to-End Architecture
-                  Google Cloud Storage
-                           |
-                           v
-             raw/retail/sales/sales.csv
-                           |
-                           v
-              Google Cloud Storage SDK
-                           |
-                           v
-                        PySpark
-                           |
-              +------------+------------+
-              |                         |
-              v                         v
-       Transformations            Data Quality
-              |                         |
-              +------------+------------+
-                           |
-                           v
+- GCS bucket
+- Raw data folder structure
+- Raw sales CSV
+- Google Cloud Storage Python client
+- GCS-to-PySpark integration
+- GCS as default source
+- Local CSV fallback
+
+## Phase 5 — Pipeline Orchestration
+
+Status:
+
+COMPLETE
+
+Implemented:
+
+- Reusable pipeline tasks
+- Shared pipeline context
+- Task dependencies
+- Retry handling
+- Task-level logging
+- Failure handling
+- Cleanup
+- Lightweight local orchestration
+- Airflow-compatible DAG structure
+- Orchestration tests
+
+---
+
+# 43. Current End-to-End Architecture
+
+                    Google Cloud Storage
+                             |
+                             v
+              raw/retail/sales/sales.csv
+                             |
+                             v
+               Google Cloud Storage SDK
+                             |
+                             v
+                          PySpark
+                             |
+                +------------+------------+
+                |                         |
+                v                         v
+         Transformations            Data Quality
+                |                         |
+                +------------+------------+
+                             |
+                             v
+                    Create Analytics
+                             |
+                             v
                   Incremental Processing
                        order_id
-                           |
-                           v
-               BigQuery sales_partitioned
-                           |
-                +----------+----------+
-                |                     |
-                v                     v
-           Partitioning          Clustering
-           order_date          category/store_id
+                             |
+                             v
+                    BigQuery Load
+                             |
+                +------------+------------+
+                |                         |
+                v                         v
+          Partitioning              Clustering
+          order_date             category/store_id
                 |
                 v
              Analytics
@@ -990,7 +1335,18 @@ Local CSV fallback
        v        v        v         v
      Daily   Category  Store   Payment
      Sales    Sales    Sales   Method Sales
-40. Validation Summary
+                             |
+                             v
+                      Orchestrator
+                             |
+                    +--------+--------+
+                    |                 |
+                    v                 v
+                  Retry            Cleanup
+
+---
+
+# 44. Validation Summary
 
 The complete pipeline has been successfully validated.
 
@@ -1019,7 +1375,7 @@ PASS
 
 Automated tests:
 
-9 passed
+13 passed
 
 Partitioning:
 
@@ -1029,9 +1385,17 @@ Clustering:
 
 category
 store_id
-41. Project Status
+
+Orchestration:
+
+SUCCESS
+
+---
+
+# 45. Project Status
+
 ============================================================
-PROJECT 3 STATUS
+PROJECT STATUS
 ============================================================
 
 GCS Raw Layer             : COMPLETE
@@ -1042,49 +1406,70 @@ Incremental Loading      : COMPLETE
 Partitioning             : COMPLETE
 Clustering               : COMPLETE
 Analytics                : COMPLETE
-Automated Tests          : 9 PASSED
+Pipeline Orchestration   : COMPLETE
+Automated Tests          : 13 PASSED
 End-to-End Pipeline      : PASS
 
 ============================================================
-42. Future Enhancements
 
-Potential next improvements include:
+---
 
-Orchestration
-Apache Airflow
-Cloud Composer
-Cloud Scheduler
-Event-driven processing
-GCS
-Multiple file ingestion
-File arrival validation
-Archive layer
-GCS lifecycle policies
-Date-partitioned raw folders
-BigQuery
-MERGE-based incremental processing
-Partition expiration
-Advanced clustering
-Slowly Changing Dimensions
-Cost optimization
-Monitoring
-Cloud Logging
-Cloud Monitoring
-Pipeline failure alerts
-Data quality dashboards
-CI/CD
-GitHub Actions
-Automated PyTest execution
-Code quality checks
-Automated deployment
-Analytics
-Looker Studio dashboard
-Retail KPI dashboard
-Revenue trends
-Category performance
-Store performance
-Payment method analysis
-43. Author
+# 46. Future Enhancements
+
+Potential future improvements include:
+
+## Orchestration
+
+- Apache Airflow
+- Cloud Composer
+- Cloud Scheduler
+- Event-driven processing
+- Production scheduling
+- Dependency monitoring
+
+## GCS
+
+- Multiple file ingestion
+- File arrival validation
+- Archive layer
+- GCS lifecycle policies
+- Date-partitioned raw folders
+
+## BigQuery
+
+- MERGE-based incremental processing
+- Partition expiration
+- Advanced clustering
+- Slowly Changing Dimensions
+- Cost optimization
+
+## Monitoring
+
+- Cloud Logging
+- Cloud Monitoring
+- Pipeline failure alerts
+- Data quality dashboards
+- Execution metrics
+
+## CI/CD
+
+- GitHub Actions
+- Automated PyTest execution
+- Code quality checks
+- Automated deployment
+
+## Analytics
+
+- Looker Studio dashboard
+- Retail KPI dashboard
+- Revenue trends
+- Category performance
+- Store performance
+- Payment method analysis
+
+---
+
+# 47. Author
 
 Ramakrishna Vulli
 
@@ -1102,16 +1487,20 @@ ETL / ELT
 Incremental Data Processing
 Partitioning
 Clustering
+Pipeline Orchestration
 PyTest
 Google Cloud Platform
-44. Conclusion
+
+---
+
+# 48. Conclusion
 
 This project demonstrates a complete cloud-based retail data engineering pipeline.
 
 The pipeline:
 
 1. Stores raw data in GCS
-2. Reads the raw data using the GCS Python client
+2. Reads raw data using the GCS Python client
 3. Processes data using PySpark
 4. Performs data quality validation
 5. Calculates retail sales metrics
@@ -1119,7 +1508,8 @@ The pipeline:
 7. Loads only new records into BigQuery
 8. Uses partitioning and clustering for the production sales table
 9. Generates analytical tables
-10. Validates functionality using automated tests
+10. Uses reusable orchestration tasks
+11. Supports retry and failure handling
+12. Validates functionality using automated tests
 
 The result is a scalable, testable, and production-oriented GCP retail data engineering architecture.
-
