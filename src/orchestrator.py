@@ -9,6 +9,7 @@ This module provides:
 - Task-level logging
 - Failure handling
 - Pipeline summary
+- Pipeline monitoring
 
 The design is intentionally Airflow-compatible.
 
@@ -32,6 +33,14 @@ from src.tasks import (
     task_cleanup,
 )
 
+from src.monitoring import (
+    start_monitoring,
+    record_task_status,
+    record_retry,
+    complete_monitoring,
+    print_monitoring_report,
+)
+
 
 # ============================================================
 # Configuration
@@ -40,6 +49,12 @@ from src.tasks import (
 MAX_RETRIES = 2
 
 RETRY_DELAY_SECONDS = 5
+
+PROJECT_ID = "vast-falcon-415411"
+
+DATASET_ID = "retail_analytics"
+
+PRODUCTION_TABLE = "sales_partitioned"
 
 
 # ============================================================
@@ -50,33 +65,39 @@ def run_task(
     task_name,
     task_function,
     context,
+    metrics=None,
 ):
     """
     Execute one task with retry support.
+
+    If monitoring metrics are provided, task status
+    and retry information are recorded.
     """
 
     print()
-    print(
-        "#" * 70
-    )
+    print("#" * 70)
 
     print(
         f"TASK STARTED: {task_name}"
     )
 
-    print(
-        "#" * 70
-    )
+    print("#" * 70)
 
     attempt = 0
+
+    if metrics is not None:
+
+        record_task_status(
+            metrics,
+            task_name,
+            "RUNNING",
+        )
 
     while True:
 
         attempt += 1
 
-        start_time = (
-            time.time()
-        )
+        start_time = time.time()
 
         try:
 
@@ -91,10 +112,8 @@ def run_task(
                 f"{MAX_RETRIES + 1}"
             )
 
-            context = (
-                task_function(
-                    context
-                )
+            context = task_function(
+                context
             )
 
             duration = (
@@ -112,6 +131,14 @@ def run_task(
                 f"Duration: "
                 f"{duration:.2f} seconds"
             )
+
+            if metrics is not None:
+
+                record_task_status(
+                    metrics,
+                    task_name,
+                    "SUCCESS",
+                )
 
             return context
 
@@ -145,6 +172,14 @@ def run_task(
                     f"for task: {task_name}"
                 )
 
+                if metrics is not None:
+
+                    record_task_status(
+                        metrics,
+                        task_name,
+                        "FAILED",
+                    )
+
                 raise
 
             print()
@@ -153,6 +188,18 @@ def run_task(
                 f"{RETRY_DELAY_SECONDS} "
                 f"seconds..."
             )
+
+            if metrics is not None:
+
+                record_retry(
+                    metrics
+                )
+
+                record_task_status(
+                    metrics,
+                    task_name,
+                    "RETRY",
+                )
 
             time.sleep(
                 RETRY_DELAY_SECONDS
@@ -166,16 +213,12 @@ def run_task(
 def run_orchestrated_pipeline():
     """
     Execute the complete pipeline using explicit
-    task dependencies.
+    task dependencies and pipeline monitoring.
     """
 
-    start_time = (
-        time.time()
-    )
+    start_time = time.time()
 
-    start_timestamp = (
-        datetime.now()
-    )
+    start_timestamp = datetime.now()
 
     print()
     print("=" * 70)
@@ -197,11 +240,21 @@ def run_orchestrated_pipeline():
         f"{start_timestamp}"
     )
 
-    context = (
-        PipelineContext()
+    # --------------------------------------------------------
+    # Start monitoring
+    # --------------------------------------------------------
+
+    metrics = start_monitoring(
+        project=PROJECT_ID,
+        dataset=DATASET_ID,
+        production_table=PRODUCTION_TABLE,
     )
 
+    context = PipelineContext()
+
     pipeline_success = False
+
+    pipeline_error = ""
 
     try:
 
@@ -213,6 +266,7 @@ def run_orchestrated_pipeline():
             "create_spark_session",
             task_create_spark,
             context,
+            metrics,
         )
 
         # ====================================================
@@ -223,6 +277,7 @@ def run_orchestrated_pipeline():
             "load_source_data",
             task_load_source,
             context,
+            metrics,
         )
 
         # ====================================================
@@ -233,6 +288,7 @@ def run_orchestrated_pipeline():
             "transform_sales",
             task_transform,
             context,
+            metrics,
         )
 
         # ====================================================
@@ -243,6 +299,7 @@ def run_orchestrated_pipeline():
             "data_quality",
             task_data_quality,
             context,
+            metrics,
         )
 
         # ====================================================
@@ -253,6 +310,7 @@ def run_orchestrated_pipeline():
             "create_analytics",
             task_create_analytics,
             context,
+            metrics,
         )
 
         # ====================================================
@@ -263,6 +321,7 @@ def run_orchestrated_pipeline():
             "create_bigquery_client",
             task_create_bigquery_client,
             context,
+            metrics,
         )
 
         # ====================================================
@@ -273,6 +332,7 @@ def run_orchestrated_pipeline():
             "filter_new_sales",
             task_filter_new_sales,
             context,
+            metrics,
         )
 
         # ====================================================
@@ -283,14 +343,28 @@ def run_orchestrated_pipeline():
             "load_bigquery",
             task_load_bigquery,
             context,
+            metrics,
         )
 
         pipeline_success = True
 
+    except Exception as exc:
+
+        pipeline_error = str(exc)
+
+        print()
+        print(
+            "Pipeline execution failed:"
+        )
+
+        print(
+            pipeline_error
+        )
+
     finally:
 
         # ====================================================
-        # Cleanup
+        # Task 9 - Cleanup
         # ====================================================
 
         try:
@@ -299,6 +373,7 @@ def run_orchestrated_pipeline():
                 "cleanup",
                 task_cleanup,
                 context,
+                metrics,
             )
 
         except Exception as cleanup_error:
@@ -311,6 +386,115 @@ def run_orchestrated_pipeline():
             print(
                 cleanup_error
             )
+
+            if not pipeline_success:
+
+                pipeline_error = (
+                    pipeline_error
+                    or str(cleanup_error)
+                )
+
+    # ========================================================
+    # Collect Pipeline Metrics
+    # ========================================================
+
+    if (
+        context.source_count
+        is not None
+    ):
+
+        metrics.source_records = (
+            context.source_count
+        )
+
+    if (
+        context.transformed_count
+        is not None
+    ):
+
+        metrics.transformed_records = (
+            context.transformed_count
+        )
+
+    if (
+        context.new_sales_count
+        is not None
+    ):
+
+        metrics.new_records = (
+            context.new_sales_count
+        )
+
+    # --------------------------------------------------------
+    # Data quality status
+    # --------------------------------------------------------
+
+    if (
+        metrics.task_status.get(
+            "data_quality"
+        )
+        == "SUCCESS"
+    ):
+
+        metrics.data_quality_status = (
+            "PASS"
+        )
+
+    elif (
+        metrics.task_status.get(
+            "data_quality"
+        )
+        == "FAILED"
+    ):
+
+        metrics.data_quality_status = (
+            "FAIL"
+        )
+
+    # --------------------------------------------------------
+    # BigQuery status
+    # --------------------------------------------------------
+
+    if (
+        metrics.task_status.get(
+            "load_bigquery"
+        )
+        == "SUCCESS"
+    ):
+
+        metrics.bigquery_status = (
+            "SUCCESS"
+        )
+
+    elif (
+        metrics.task_status.get(
+            "load_bigquery"
+        )
+        == "FAILED"
+    ):
+
+        metrics.bigquery_status = (
+            "FAILED"
+        )
+
+    # ========================================================
+    # Complete Monitoring
+    # ========================================================
+
+    if pipeline_success:
+
+        complete_monitoring(
+            metrics,
+            status="SUCCESS",
+        )
+
+    else:
+
+        complete_monitoring(
+            metrics,
+            status="FAILED",
+            error_message=pipeline_error,
+        )
 
     # ========================================================
     # Final Summary
@@ -374,6 +558,14 @@ def run_orchestrated_pipeline():
 
     print("=" * 70)
 
+    # ========================================================
+    # Monitoring Report
+    # ========================================================
+
+    print_monitoring_report(
+        metrics
+    )
+
     return context
 
 
@@ -387,4 +579,5 @@ def main():
 
 
 if __name__ == "__main__":
+
     main()
