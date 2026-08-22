@@ -10,7 +10,7 @@
 
 ## Production-Style Retail Data Engineering Project
 
-An end-to-end cloud data engineering pipeline built using Python, PySpark, Google Cloud Storage, BigQuery, GitHub Actions, and Google Cloud Workload Identity Federation.
+An end-to-end cloud data engineering pipeline built using **Python, PySpark, Google Cloud Storage, BigQuery, GitHub Actions, and Google Cloud Workload Identity Federation**.
 
 The project demonstrates production-oriented data engineering practices including:
 
@@ -53,58 +53,84 @@ The project demonstrates production-oriented data engineering practices includin
 
 # 1. Architecture
 
+The pipeline follows an end-to-end cloud data engineering architecture:
+
 ```text
+                    GITHUB / CI-CD & SECURITY
+
                          GitHub Repository
                                 |
                                 v
                          GitHub Actions
                                 |
                                 v
-                    GitHub OIDC Authentication
+                         GitHub OIDC
                                 |
                                 v
-                Google Cloud Workload Identity
-                       Federation
+                Workload Identity Federation
                                 |
                                 v
                      Google Cloud Project
                       vast-falcon-415411
                                 |
-              +-----------------+----------------+
-              |                                  |
-              v                                  v
-      Google Cloud Storage                  BigQuery
-              |                                  |
-        sales.csv                         retail_analytics
-              |                                  |
-              v                                  v
-           PySpark                       sales_partitioned
-              |
-      +-------+--------+
-      |                |
-      v                v
-Transformation    Data Quality
-      |                |
-      +-------+--------+
-              |
-              v
-         Analytics
-              |
-      +-------+--------+----------------+
-      |       |        |                |
-      v       v        v                v
-    Daily   Category  Store       Payment Method
-    Sales    Sales    Sales            Sales
-              |
-              v
-      Incremental Loading
-              |
-              v
-      BigQuery Production
-           Table
-              |
-              v
-       Monitoring / Reporting
+                                |
+                    DATA ENGINEERING PIPELINE
+                                |
+                                v
+                    Google Cloud Storage
+                                |
+                         sales.csv
+                                |
+                                v
+                             PySpark
+                                |
+                  +-------------+-------------+
+                  |                           |
+                  v                           v
+            Transformation              Data Quality
+                  |                           |
+                  +-------------+-------------+
+                                |
+                                v
+                            Analytics
+                                |
+              +-----------------+------------------+
+              |                 |                  |
+              v                 v                  v
+          daily_sales      category_sales      store_sales
+                                |
+                                v
+                       payment_method_sales
+                                |
+                                v
+                    Incremental Processing
+                                |
+                         Existing Order IDs
+                                |
+                                v
+                          New Orders Only
+                                |
+                                v
+                            BigQuery
+                                |
+                                v
+                         retail_analytics
+                                |
+                                v
+                       sales_partitioned
+                                |
+                     +----------+----------+
+                     |                     |
+                     v                     v
+               Partitioning           Clustering
+               order_date             category
+                                     store_id
+                                |
+                                v
+                    Pipeline Monitoring
+                                |
+                                v
+                       Status / Metrics
 2. Technology Stack
 Category	Technology
 Programming	Python 3.12
@@ -144,9 +170,13 @@ Incremental Filtering
 BigQuery
      |
      +--> sales_partitioned
+     |
      +--> daily_sales
+     |
      +--> category_sales
+     |
      +--> store_sales
+     |
      +--> payment_method_sales
 
 The pipeline can be executed locally using Python or through GitHub Actions.
@@ -497,7 +527,83 @@ create_bigquery_client     : SUCCESS
 filter_new_sales           : SUCCESS
 load_bigquery              : SUCCESS
 cleanup                    : SUCCESS
-17. Automated Testing
+17. Project Evidence
+Pipeline Architecture
+
+The architecture represents the implemented end-to-end data engineering pipeline.
+
+Automated CI Testing
+
+GitHub Actions automatically executes the project's PyTest suite.
+
+CI Validation
+20 automated tests
+20 tests passed
+BigQuery incremental loading validated
+Data quality validation
+Monitoring validation
+Orchestration and retry validation
+PySpark transformation validation
+GCP Pipeline Execution
+
+The pipeline can be executed through GitHub Actions using secure GitHub OIDC authentication and Google Cloud Workload Identity Federation.
+
+Pipeline execution:
+
+GitHub Actions
+      |
+      v
+OIDC Authentication
+      |
+      v
+Workload Identity Federation
+      |
+      v
+Google Cloud
+      |
+      v
+GCS
+      |
+      v
+PySpark
+      |
+      v
+BigQuery
+BigQuery Production Table
+
+Validated production table:
+
+vast-falcon-415411.retail_analytics.sales_partitioned
+
+BigQuery Configuration
+Partition column: order_date
+Partition type: DAY
+Clustering column 1: category
+Clustering column 2: store_id
+Pipeline Monitoring
+
+The pipeline records execution status, processing metrics, data-quality status, BigQuery load status, retries, and failed tasks.
+
+Successful Execution
+Status              : SUCCESS
+Source Records      : 16
+Transformed Records : 16
+New Records         : 0
+Data Quality        : PASS
+BigQuery Load       : SUCCESS
+Retries             : 0
+Failed Tasks         : 0
+Task Status
+create_spark_session       : SUCCESS
+load_source_data           : SUCCESS
+transform_sales            : SUCCESS
+data_quality               : SUCCESS
+create_analytics           : SUCCESS
+create_bigquery_client     : SUCCESS
+filter_new_sales           : SUCCESS
+load_bigquery              : SUCCESS
+cleanup                    : SUCCESS
+18. Automated Testing
 
 The project uses pytest.
 
@@ -513,7 +619,7 @@ BigQuery Incremental Loading Tests
 Existing orders are skipped
 New orders are loaded
 Duplicate orders are prevented
-All existing orders return an empty dataset
+Existing orders return an empty dataset
 Partition configuration is validated
 Clustering configuration is validated
 Data Quality Tests
@@ -521,8 +627,8 @@ Valid data passes
 Invalid discount values fail
 Monitoring Tests
 Monitoring starts correctly
-Successful task status is recorded
-Failed task status is recorded
+Task success is recorded
+Task failure is recorded
 Retry count is recorded
 Successful monitoring completion works
 Failed monitoring completion works
@@ -538,7 +644,7 @@ Sales transformation
 Expected result:
 
 20 passed
-18. GitHub Actions CI
+19. GitHub Actions CI
 
 CI workflow:
 
@@ -567,7 +673,7 @@ python -m pytest tests -v
 Expected result:
 
 20 passed
-19. Scheduled Cloud Pipeline
+20. Scheduled Cloud Pipeline
 
 Workflow:
 
@@ -612,7 +718,7 @@ GCS → PySpark → BigQuery
 Pipeline command:
 
 python -m src.orchestrator
-20. Secure GitHub-to-GCP Authentication
+21. Secure GitHub-to-GCP Authentication
 
 GitHub Actions uses:
 
@@ -644,7 +750,7 @@ github-actions-retail-pipeline
 Repository:
 
 ramakrishna-vulli/gcp-retail-data-engineering-pipeline
-21. Security
+22. Security
 
 Do not commit:
 
@@ -659,20 +765,27 @@ The project uses GitHub OIDC and Google Cloud Workload Identity Federation inste
 
 The GitHub service account should receive only the permissions required by the pipeline.
 
-22. Project Structure
+23. Project Structure
 gcp-retail-data-engineering-pipeline/
-│
+|
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml
 │       └── pipeline.yml
-│
+|
 ├── data/
 │   └── sales.csv
-│
+|
 ├── dags/
 │   └── retail_pipeline_dag.py
-│
+|
+├── docs/
+│   ├── architecture.png
+│   ├── github-actions-ci.png
+│   ├── github-actions-pipeline.png
+│   ├── bigquery-table.png
+│   └── monitoring-output.png
+|
 ├── src/
 │   ├── __init__.py
 │   ├── analytics.py
@@ -684,18 +797,18 @@ gcp-retail-data-engineering-pipeline/
 │   ├── setup_partitioned_sales.py
 │   ├── tasks.py
 │   └── transform.py
-│
+|
 ├── tests/
 │   ├── test_bigquery_incremental.py
 │   ├── test_data_quality.py
 │   ├── test_monitoring.py
 │   ├── test_orchestrator.py
 │   └── test_transform.py
-│
+|
 ├── requirements.txt
 ├── README.md
 └── .gitignore
-23. Local Setup
+24. Local Setup
 
 Recommended environment:
 
@@ -713,9 +826,9 @@ Windows activation:
 Install dependencies:
 
 pip install -r requirements.txt
-24. Run Locally
+25. Run Locally
 
-Run the orchestrated pipeline:
+Run:
 
 python -m src.orchestrator
 
@@ -731,7 +844,7 @@ The pipeline executes:
 8. Load new records
 9. Cleanup
 10. Generate monitoring summary
-25. Run Tests Locally
+26. Run Tests Locally
 
 Run:
 
@@ -740,19 +853,11 @@ python -m pytest tests -v
 Expected:
 
 20 passed
-26. Verified Production Result
+27. Verified Production Result
 
-The production BigQuery table was verified after cloud pipeline execution.
+Production BigQuery table:
 
-Query:
-
-SELECT
-    COUNT(*) AS total_rows,
-    COUNT(DISTINCT order_id) AS unique_orders,
-    MIN(order_date) AS min_order_date,
-    MAX(order_date) AS max_order_date
-FROM
-    `vast-falcon-415411.retail_analytics.sales_partitioned`;
+vast-falcon-415411.retail_analytics.sales_partitioned
 
 Verified result:
 
@@ -767,7 +872,7 @@ Therefore:
 16 total records
 16 unique orders
 0 duplicate orders
-27. Verified BigQuery Configuration
+28. Verified BigQuery Configuration
 
 Production table:
 
@@ -787,22 +892,6 @@ Clustering:
 2. store_id
 
 The BigQuery metadata confirmed the partitioning and clustering configuration.
-
-28. Verified Pipeline Execution
-
-Example successful execution:
-
-Status              : SUCCESS
-Duration            : 86.17 seconds
-Source Records      : 16
-Transformed Records : 16
-New Records         : 0
-Data Quality        : PASS
-BigQuery Load       : SUCCESS
-Retries             : 0
-Failed Tasks         : 0
-
-This confirms that the pipeline can safely rerun the same source dataset without creating duplicate production records.
 
 29. CI/CD Flow
 Developer
@@ -905,7 +994,7 @@ Development / staging / production environments
 Automated deployment environments
 Pipeline failure alerting
 
-The current project uses a lightweight Python orchestrator. Airflow/Cloud Composer is considered a future orchestration option rather than the current production execution engine.
+The current project uses a lightweight Python orchestrator. Airflow / Cloud Composer is a future orchestration option rather than the current production execution engine.
 
 34. Key Engineering Skills Demonstrated
 Programming
@@ -981,8 +1070,21 @@ https://github.com/ramakrishna-vulli/gcp-retail-data-engineering-pipeline
 
 Conclusion
 
-The GCP Retail Data Engineering Pipeline demonstrates an end-to-end cloud data engineering solution covering ingestion, transformation, validation, incremental processing, analytical modeling, cloud warehousing, orchestration, monitoring, automated testing, CI/CD, and secure cloud authentication.
+The GCP Retail Data Engineering Pipeline demonstrates an end-to-end cloud data engineering solution covering:
+
+Data ingestion
+PySpark transformation
+Data quality
+Incremental processing
+Analytical modeling
+BigQuery warehousing
+Partitioning
+Clustering
+Task orchestration
+Retry handling
+Monitoring
+Automated testing
+CI/CD
+Secure cloud authentication
 
 The project is designed as a portfolio demonstration of production-oriented Data Engineering practices using Python, PySpark, and Google Cloud.
-
-
